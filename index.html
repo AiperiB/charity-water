@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFC907" />
+    <title>Captain H2O | charity: water prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="backdrop backdrop-a"></div>
+      <div class="backdrop backdrop-b"></div>
+      <div class="backdrop backdrop-c"></div>
+
+      <main class="game-frame">
+        <section class="hud hud-top" aria-label="Game status">
+          <div class="hud-chip">
+            <span class="hud-label">Oxygen</span>
+            <div class="meter"><span id="oxygenFill"></span></div>
+            <strong id="oxygenValue">100%</strong>
+          </div>
+          <div class="hud-chip">
+            <span class="hud-label">Lives</span>
+            <strong id="livesValue">3</strong>
+          </div>
+          <div class="hud-chip">
+            <span class="hud-label">Liters Saved</span>
+            <strong id="litersValue">0</strong>
+          </div>
+          <div class="hud-chip">
+            <span class="hud-label">Level</span>
+            <strong id="levelValue">1</strong>
+          </div>
+        </section>
+
+        <section class="stage-shell">
+          <canvas id="gameCanvas" aria-label="Captain H2O game board"></canvas>
+          <div class="water-ripple"></div>
+          <div class="can-stage">
+            <div class="can-glow"></div>
+            <div class="jerry-can" aria-hidden="true">
+              <div class="can-handle"></div>
+              <div class="can-body">
+                <div class="can-fill" id="canFill"></div>
+                <div class="can-mark">H2O</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="hud hud-bottom">
+          <div class="instruction-panel">
+            <strong>Slice H2O. Avoid toxins.</strong>
+            <p id="levelFact">Dirt makes water cloudy but is easy to filter.</p>
+          </div>
+          <div class="button-row">
+            <button class="icon-button" id="pauseBtn" type="button">Pause</button>
+            <button class="icon-button" id="restartBtn" type="button">Restart</button>
+          </div>
+        </section>
+      </main>
+
+      <section class="screen screen-visible" id="titleScreen" aria-label="Title screen">
+        <div class="screen-card hero-card">
+          <div class="brand-lockup on-dark">
+            <div class="brand-can">JERRY CAN</div>
+            <div class="brand-wordmark">charity: water</div>
+          </div>
+          <div class="eyebrow">CAPTAIN H2O</div>
+          <h1>Protect clean water, one slice at a time.</h1>
+          <div class="hero-media" aria-label="Brand photo preview">
+            <img
+              src="./photos/Screenshot 2026-08-01 at 7.01.44 PM.png"
+              alt="A person holding glasses of clean and dirty water"
+            />
+          </div>
+          <p>
+            A brand-aligned prototype inspired by charity: water's mission, colors, and emphasis on dignity, education, and action.
+          </p>
+          <div class="hero-actions">
+            <button class="primary-button" id="playBtn" type="button">Play</button>
+            <button class="secondary-button" id="learnBtn" type="button">Learn More</button>
+          </div>
+          <div class="hero-stats">
+            <div><span>10</span><small>levels</small></div>
+            <div><span>60fps</span><small>target</small></div>
+            <div><span>Touch</span><small>ready</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="transitionScreen" aria-label="Level transition screen">
+        <div class="screen-card transition-card">
+          <div class="eyebrow">level transition</div>
+          <div class="transition-grid">
+            <figure class="photo-tile dirty">
+              <img src="./photos/Screenshot 2026-08-01 at 7.01.56 PM.png" alt="Dirty water and clean water shown in one frame" />
+              <span>Dirty water source</span>
+            </figure>
+            <figure class="photo-tile clean">
+              <img src="./photos/Screenshot 2026-08-01 at 7.01.31 PM.png" alt="Dirty water and clean water shown in one frame" />
+              <span>Clean water source</span>
+            </figure>
+          </div>
+          <h2 id="transitionTitle">Level 1 complete</h2>
+          <p id="transitionBody">You removed sediment and kept the village supplied with cleaner water.</p>
+          <div class="hero-actions">
+            <button class="primary-button" id="continueBtn" type="button">Continue</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="gameOverScreen" aria-label="Game over screen">
+        <div class="screen-card end-card">
+          <div class="eyebrow">GAME OVER</div>
+          <h2>Reset and try again.</h2>
+          <p id="gameOverText">You saved 0 liters before running out of oxygen or lives.</p>
+          <div class="hero-actions">
+            <button class="primary-button" id="tryAgainBtn" type="button">Try Again</button>
+            <button class="secondary-button" id="donateBtn" type="button">Donate</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="winScreen" aria-label="Game complete screen">
+        <div class="screen-card end-card win-card">
+          <div class="eyebrow">YOU DID IT</div>
+          <div class="brand-lockup brand-lockup-end on-dark">
+            <div class="brand-can">JERRY CAN</div>
+            <div class="brand-wordmark">charity: water</div>
+          </div>
+          <h2>Captain H2O helped protect clean water.</h2>
+          <p id="winText">You saved 0 liters and helped deliver clean water.</p>
+          <div class="hero-actions">
+            <button class="primary-button" id="playAgainBtn" type="button">Play Again</button>
+            <button class="secondary-button" id="shareBtn" type="button">Share Score</button>
+          </div>
+          <div class="partner-lockup">Your organization + charity: water</div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
