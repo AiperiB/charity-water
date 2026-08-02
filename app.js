@@ -5,6 +5,7 @@ const oxygenFill = document.getElementById("oxygenFill");
 const oxygenValue = document.getElementById("oxygenValue");
 const livesValue = document.getElementById("livesValue");
 const litersValue = document.getElementById("litersValue");
+const scoreValue = document.getElementById("scoreValue");
 const levelValue = document.getElementById("levelValue");
 const canFill = document.getElementById("canFill");
 const levelFact = document.getElementById("levelFact");
@@ -108,6 +109,7 @@ const state = {
   oxygen: 100,
   lives: 3,
   liters: 0,
+  score: 0,
   canFillPct: 0,
   level: 1,
   levelSlices: 0,
@@ -115,6 +117,7 @@ const state = {
   lastTime: 0,
   flash: 0,
   scoreEffects: [],
+  confetti: [],
 };
 
 let frameId = 0;
@@ -160,6 +163,7 @@ function updateHud() {
   oxygenValue.textContent = `${Math.round(oxygen)}%`;
   livesValue.textContent = `${state.lives}`;
   litersValue.textContent = `${state.liters}`;
+  scoreValue.textContent = `${Math.max(0, Math.round(state.score))}`;
   levelValue.textContent = `${state.level}`;
   const fill = Math.max(0, Math.min(100, state.canFillPct));
   canFill.style.height = `${fill}%`;
@@ -190,9 +194,12 @@ function startGame() {
   state.oxygen = 100;
   state.lives = 3;
   state.liters = 0;
+  state.score = 0;
   state.level = 1;
   state.lastTime = performance.now();
   resetLevelProgress();
+  state.confetti = [];
+  state.scoreEffects = [];
   setScreen(null);
   pauseBtn.textContent = "Pause";
   startLoop();
@@ -205,9 +212,12 @@ function restartGame() {
   state.oxygen = 100;
   state.lives = 3;
   state.liters = 0;
+  state.score = 0;
   state.level = 1;
   state.lastTime = performance.now();
   resetLevelProgress();
+  state.confetti = [];
+  state.scoreEffects = [];
   setScreen(null);
   pauseBtn.textContent = "Pause";
   startLoop();
@@ -244,7 +254,11 @@ function rand(min, max) {
 
 function pickType() {
   const config = currentConfig();
-  return Math.random() < config.ratio ? "toxin" : "h2o";
+  const roll = Math.random();
+  if (roll < 0.07) {
+    return "challenge";
+  }
+  return roll < 0.07 + config.ratio ? "toxin" : "h2o";
 }
 
 function makeObject() {
@@ -259,18 +273,24 @@ function makeObject() {
   const vy = -baseSpeed * rand(0.9, 1.15);
   const wobble = rand(0, Math.PI * 2);
   const life = Math.max(6000, travel / Math.abs(vy) * 1000 + 1600);
+  const isChallenge = type === "challenge";
   return {
     type,
     x: startX,
     y: state.height + radius + 10,
     vx,
     vy,
-    radius,
+    radius: isChallenge ? radius * 1.15 : radius,
     age: 0,
     life,
     wobble,
     sliced: false,
-    color: type === "h2o" ? "#ffc907" : facts[Math.min(state.level - 1, facts.length - 1)].color,
+    color:
+      type === "h2o"
+        ? "#ffc907"
+        : type === "challenge"
+          ? "#1a1a1a"
+          : facts[Math.min(state.level - 1, facts.length - 1)].color,
   };
 }
 
@@ -292,11 +312,28 @@ function addScoreEffect(amount, x, y) {
   state.scoreEffects.push({ x, y, amount, age: 0, life: 800 });
 }
 
+function spawnConfetti() {
+  const colors = ["#ffc907", "#003366", "#77a8bb", "#fed8c1", "#fff7e1"];
+  state.confetti = Array.from({ length: 90 }, () => ({
+    x: rand(0, state.width),
+    y: rand(-state.height * 0.2, state.height * 0.2),
+    vx: rand(-0.12, 0.12),
+    vy: rand(0.18, 0.52),
+    size: rand(4, 10),
+    spin: rand(-0.08, 0.08),
+    angle: rand(0, Math.PI * 2),
+    color: colors[Math.floor(rand(0, colors.length))],
+    life: rand(1800, 3000),
+    age: 0,
+  }));
+}
+
 function sliceObject(object) {
   object.sliced = true;
   state.flash = Math.max(state.flash, object.type === "h2o" ? 0.16 : 0.32);
   if (object.type === "h2o") {
     state.liters += 1;
+    state.score += 10;
     state.oxygen = Math.min(100, state.oxygen + 2);
     const config = currentConfig();
     const fillAmount = rand(config.fill[0], config.fill[1]);
@@ -316,11 +353,18 @@ function sliceObject(object) {
     if (state.canFillPct >= 100) {
       completeLevel();
     }
+  } else if (object.type === "challenge") {
+    state.score = Math.max(0, state.score - 15);
+    state.canFillPct = Math.max(0, state.canFillPct - 8);
+    addEffect(object.x, object.y, "#1a1a1a", 30);
+    addScoreEffect(-15, object.x, object.y - 10);
   } else {
     state.lives -= 1;
     state.oxygen = Math.max(0, state.oxygen - 7);
     state.canFillPct = Math.max(0, state.canFillPct - 10);
+    state.score = Math.max(0, state.score - 5);
     addEffect(object.x, object.y, "#bf6c46", 28);
+    addScoreEffect(-5, object.x, object.y - 10);
     if (state.lives <= 0 || state.oxygen <= 0) {
       gameOver();
     }
@@ -339,14 +383,30 @@ function drawScoreEffects(now) {
     const y = s.y - p * 46;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#ffc907';
+    ctx.fillStyle = s.amount >= 0 ? '#ffc907' : '#bf6c46';
     ctx.font = `${18 + p * 8}px "Gill Sans", sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(`+${s.amount}`, s.x, y);
+    ctx.fillText(`${s.amount >= 0 ? '+' : ''}${s.amount}`, s.x, y);
     ctx.restore();
     toKeep.push(s);
   }
   state.scoreEffects = toKeep;
+}
+
+function drawConfetti() {
+  if (!state.confetti.length) {
+    return;
+  }
+  for (const piece of state.confetti) {
+    const alpha = Math.max(0, 1 - piece.age / piece.life);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = piece.color;
+    ctx.translate(piece.x, piece.y);
+    ctx.rotate(piece.angle);
+    ctx.fillRect(-piece.size / 2, -piece.size / 4, piece.size, piece.size / 2);
+    ctx.restore();
+  }
 }
 
 function completeLevel() {
@@ -374,7 +434,9 @@ function gameOver() {
 function winGame() {
   state.mode = "win";
   state.running = false;
-  winText.textContent = `You saved ${state.liters} liters across all 10 levels and helped deliver clean water.`;
+  winText.textContent = `You saved ${state.liters} liters, scored ${Math.max(0, Math.round(state.score))} points, and helped deliver clean water.`;
+  spawnConfetti();
+  startLoop();
   setScreen(winScreen);
 }
 
@@ -398,6 +460,15 @@ function advanceLevel() {
 
 function update(dt, now) {
   if (state.mode !== "playing" || state.paused) {
+    if (state.mode === "win" && state.confetti.length) {
+      state.confetti = state.confetti.filter((piece) => {
+        piece.age += dt;
+        piece.x += piece.vx * dt;
+        piece.y += piece.vy * dt;
+        piece.angle += piece.spin * dt;
+        return piece.age < piece.life;
+      });
+    }
     return;
   }
 
@@ -425,6 +496,10 @@ function update(dt, now) {
           gameOver();
           return;
         }
+      } else if (object.type === "challenge") {
+        state.score = Math.max(0, state.score - 10);
+        addEffect(object.x, 18, "#1a1a1a", 22);
+        addScoreEffect(-10, object.x, 18);
       }
       updateHud();
       continue;
@@ -525,6 +600,19 @@ function drawObject(object) {
     ctx.beginPath();
     ctx.arc(0, 0, object.radius * 0.12, 0, Math.PI * 2);
     ctx.fill();
+  } else if (object.type === "challenge") {
+    ctx.shadowColor = "rgba(255, 201, 7, 0.16)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(-object.radius, -object.radius, object.radius * 2, object.radius * 2);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#ffc907";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(-object.radius, -object.radius, object.radius * 2, object.radius * 2);
+    ctx.fillStyle = "#ffc907";
+    ctx.beginPath();
+    ctx.arc(0, 0, object.radius * 0.22, 0, Math.PI * 2);
+    ctx.fill();
   } else {
     ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
     ctx.shadowBlur = 12;
@@ -596,6 +684,7 @@ function render(now) {
   }
 
   drawScoreEffects(now);
+  drawConfetti();
 
   if (state.flash > 0) {
     ctx.save();
@@ -720,9 +809,11 @@ function tick(now) {
 
   if (state.mode === "playing") {
     update(dt, now);
+  } else if (state.mode === "win" && state.confetti.length) {
+    update(dt, now);
   }
   render(now);
-  if (state.mode === "playing") {
+  if (state.mode === "playing" || (state.mode === "win" && state.confetti.length)) {
     frameId = window.requestAnimationFrame(tick);
   } else {
     frameId = 0;
