@@ -24,8 +24,8 @@
   --radius-lg: 22px;
   --radius-md: 16px;
   --radius-sm: 12px;
-  --display-font: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --body-font: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --display-font: "Avenir Medium", "Avenir Medium Oblique", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --body-font: "Avenir Medium", "Avenir Medium Oblique", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -237,6 +237,44 @@ button {
   position: absolute;
   inset: 0;
   overflow: hidden;
+}
+
+/* Layer for DOM-backed object elements (mirrors canvas objects for accessibility/interaction feedback) */
+.object-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* don't block canvas pointer input */
+  z-index: 6;
+}
+
+.object-element {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  transform-origin: center center;
+  transition: transform 160ms linear, opacity 220ms ease;
+  will-change: transform, opacity;
+}
+
+.object-element.h2o {
+  background: linear-gradient(180deg, #ffd957, #ffc907);
+  box-shadow: 0 8px 20px rgba(255, 201, 7, 0.18);
+}
+
+.object-element.toxin {
+  background: linear-gradient(180deg, #bf6c46, #c05d35);
+  box-shadow: 0 8px 20px rgba(176, 108, 70, 0.18);
+}
+
+.object-element.challenge {
+  background: linear-gradient(180deg, #2b2b2b, #1a1a1a);
+  border: 3px solid rgba(255, 201, 7, 0.14);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+}
+
+.object-element.pop {
+  transform: scale(1.6) translateZ(0);
+  opacity: 0;
 }
 
 #gameCanvas {
@@ -461,6 +499,12 @@ button:active {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Preserve the brand wordmark and jerry-can lockup font as requested */
+.brand-lockup .brand-wordmark,
+.brand-lockup .brand-can {
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
 .brand-can {
@@ -709,6 +753,8 @@ button:active {
   .hud-chip {
     min-width: 100%;
     flex-basis: 100%;
+    padding: 10px 12px;
+    border-radius: 14px;
   }
 
   .hud-bottom {
@@ -733,6 +779,28 @@ button:active {
   .jerry-can {
     transform: scale(0.88);
     transform-origin: bottom center;
+  }
+
+  .hud-label {
+    font-size: 11px;
+  }
+
+  .hud-chip strong {
+    font-size: 16px;
+  }
+
+  .meter {
+    height: 10px;
+  }
+
+  .icon-button {
+    min-width: 84px;
+    padding: 10px 12px;
+  }
+
+  .primary-button,
+  .secondary-button {
+    padding: 12px 14px;
   }
 }
 
@@ -760,3 +828,5 @@ button:active {
     transform-origin: bottom center;
   }
 }
+
+/* end small-screen tweaks */

@@ -9,6 +9,7 @@ const scoreValue = document.getElementById("scoreValue");
 const levelValue = document.getElementById("levelValue");
 const canFill = document.getElementById("canFill");
 const levelFact = document.getElementById("levelFact");
+const objectLayer = document.getElementById("objectLayer");
 const titleScreen = document.getElementById("titleScreen");
 const transitionScreen = document.getElementById("transitionScreen");
 const gameOverScreen = document.getElementById("gameOverScreen");
@@ -82,17 +83,30 @@ const facts = [
 ];
 
 const levelConfig = [
-  { ratio: 0.22, spawnMin: 1300, spawnMax: 2100, speed: 0.9, fill: [5, 6] },
-  { ratio: 0.27, spawnMin: 1150, spawnMax: 2000, speed: 1.05, fill: [5, 6] },
-  { ratio: 0.32, spawnMin: 1050, spawnMax: 1850, speed: 1.18, fill: [5, 6] },
-  { ratio: 0.33, spawnMin: 1000, spawnMax: 1750, speed: 1.3, fill: [5, 7] },
-  { ratio: 0.38, spawnMin: 900, spawnMax: 1650, speed: 1.42, fill: [5, 7] },
-  { ratio: 0.44, spawnMin: 850, spawnMax: 1500, speed: 1.55, fill: [6, 7] },
-  { ratio: 0.48, spawnMin: 780, spawnMax: 1400, speed: 1.7, fill: [6, 8] },
-  { ratio: 0.5, spawnMin: 720, spawnMax: 1300, speed: 1.85, fill: [6, 8] },
-  { ratio: 0.58, spawnMin: 660, spawnMax: 1200, speed: 2.0, fill: [6, 8] },
-  { ratio: 0.65, spawnMin: 600, spawnMax: 1100, speed: 2.2, fill: [7, 9] },
+  // Levels 1-4: Easy — more H2O, slower objects, bigger fill rewards
+  { ratio: 0.06, spawnMin: 700, spawnMax: 1100, speed: 0.85, fill: [8, 10] },
+  { ratio: 0.08, spawnMin: 700, spawnMax: 1050, speed: 0.90, fill: [8, 10] },
+  { ratio: 0.10, spawnMin: 680, spawnMax: 1000, speed: 1.00, fill: [8, 10] },
+  { ratio: 0.12, spawnMin: 660, spawnMax: 980, speed: 1.10, fill: [8, 11] },
+
+  // Levels 5-7: Medium — moderate toxin chance and speed
+  { ratio: 0.16, spawnMin: 640, spawnMax: 940, speed: 1.25, fill: [7, 9] },
+  { ratio: 0.20, spawnMin: 620, spawnMax: 900, speed: 1.45, fill: [7, 9] },
+  { ratio: 0.24, spawnMin: 600, spawnMax: 860, speed: 1.60, fill: [7, 9] },
+
+  // Levels 8-10: Hard — higher toxin chance, faster objects, smaller fills
+  { ratio: 0.30, spawnMin: 560, spawnMax: 820, speed: 1.90, fill: [6, 8] },
+  { ratio: 0.36, spawnMin: 520, spawnMax: 780, speed: 2.10, fill: [6, 8] },
+  { ratio: 0.42, spawnMin: 480, spawnMax: 740, speed: 2.40, fill: [5, 7] },
 ];
+
+// Guaranteed wave settings: when `canFillPct` is below `threshold`, spawn
+// a small wave of H2O after `cooldown` ms have passed since the last wave.
+const GUARANTEED_WAVE = {
+  threshold: 35, // percent canFill below which a guaranteed wave may occur
+  cooldown: 14000, // milliseconds between guaranteed waves
+  count: 6, // number of H2O objects to spawn in the wave
+};
 
 const state = {
   mode: "title",
@@ -118,6 +132,8 @@ const state = {
   flash: 0,
   scoreEffects: [],
   confetti: [],
+  lastGuaranteedAt: 0,
+  nextObjId: 1,
 };
 
 let frameId = 0;
@@ -185,6 +201,10 @@ function resetLevelProgress() {
   state.nextSpawnDelay = rand(currentConfig().spawnMin, currentConfig().spawnMax);
   setFact();
   updateHud();
+  // clear any DOM-backed objects
+  if (objectLayer) {
+    objectLayer.innerHTML = '';
+  }
 }
 
 function startGame() {
@@ -301,7 +321,65 @@ function spawnObject(now) {
   }
   state.lastSpawnAt = now;
   state.nextSpawnDelay = rand(config.spawnMin, config.spawnMax);
-  state.objects.push(makeObject());
+  const obj = makeObject();
+  obj._id = `obj-${state.nextObjId++}`;
+  state.objects.push(obj);
+  // create a DOM element to mirror the object so we can animate/remove it
+  if (objectLayer) {
+    const el = document.createElement('div');
+    el.className = `object-element ${obj.type}`;
+    el.style.width = `${obj.radius * 2}px`;
+    el.style.height = `${obj.radius * 2}px`;
+    el.style.left = `${obj.x - obj.radius}px`;
+    el.style.top = `${obj.y - obj.radius}px`;
+    objectLayer.appendChild(el);
+    obj._el = el;
+  }
+}
+
+function spawnGuaranteedWave(now) {
+  const cfg = currentConfig();
+  const count = GUARANTEED_WAVE.count;
+  const w = state.width;
+  const h = state.height;
+  for (let i = 0; i < count; i += 1) {
+    const radius = rand(18, 26);
+    const startX = ((i + 1) / (count + 1)) * (w - radius * 2) + radius;
+    const travel = rand(h * 0.6, h * 0.95);
+    const baseSpeed = travel / 1400 * Math.max(0.8, cfg.speed * 0.9);
+    const drift = rand(-0.28, 0.28);
+    const vx = drift * rand(0.2, 0.8);
+    const vy = -baseSpeed * rand(0.85, 1.05);
+    const wobble = rand(0, Math.PI * 2);
+    const life = Math.max(5000, travel / Math.abs(vy) * 1000 + 1000);
+    const o = {
+      type: 'h2o',
+      x: startX,
+      y: h + radius + 10,
+      vx,
+      vy,
+      radius,
+      age: 0,
+      life,
+      wobble,
+      sliced: false,
+      color: '#ffc907',
+    };
+    o._id = `obj-${state.nextObjId++}`;
+    state.objects.push(o);
+    if (objectLayer) {
+      const el = document.createElement('div');
+      el.className = `object-element ${o.type}`;
+      el.style.width = `${o.radius * 2}px`;
+      el.style.height = `${o.radius * 2}px`;
+      el.style.left = `${o.x - o.radius}px`;
+      el.style.top = `${o.y - o.radius}px`;
+      objectLayer.appendChild(el);
+      o._el = el;
+    }
+  }
+  // small visual hint
+  addEffect(state.width * 0.5, 24, '#77a8bb', 18);
 }
 
 function addEffect(x, y, color, size = 18) {
@@ -334,7 +412,7 @@ function sliceObject(object) {
   if (object.type === "h2o") {
     state.liters += 1;
     state.score += 10;
-    state.oxygen = Math.min(100, state.oxygen + 2);
+    state.oxygen = Math.min(100, state.oxygen + 4);
     const config = currentConfig();
     const fillAmount = rand(config.fill[0], config.fill[1]);
     state.canFillPct = Math.min(100, state.canFillPct + fillAmount);
@@ -360,7 +438,8 @@ function sliceObject(object) {
     addScoreEffect(-15, object.x, object.y - 10);
   } else {
     state.lives -= 1;
-    state.oxygen = Math.max(0, state.oxygen - 7);
+    // reduce the harshness of slicing a toxin by lowering oxygen penalty
+    state.oxygen = Math.max(0, state.oxygen - 4);
     state.canFillPct = Math.max(0, state.canFillPct - 10);
     state.score = Math.max(0, state.score - 5);
     addEffect(object.x, object.y, "#bf6c46", 28);
@@ -370,6 +449,14 @@ function sliceObject(object) {
     }
   }
   updateHud();
+  // visually remove the DOM element if present
+  if (object._el) {
+    object._el.classList.add('pop');
+    setTimeout(() => {
+      try { object._el.remove(); } catch (e) {}
+      object._el = null;
+    }, 220);
+  }
 }
 
 function drawScoreEffects(now) {
@@ -384,7 +471,7 @@ function drawScoreEffects(now) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = s.amount >= 0 ? '#ffc907' : '#bf6c46';
-    ctx.font = `${18 + p * 8}px "Gill Sans", sans-serif`;
+    ctx.font = `${18 + p * 8}px "Avenir Medium", "Avenir Medium Oblique", "Avenir Next", sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(`${s.amount >= 0 ? '+' : ''}${s.amount}`, s.x, y);
     ctx.restore();
@@ -472,10 +559,21 @@ function update(dt, now) {
     return;
   }
 
-  state.oxygen = Math.max(0, state.oxygen - dt * 0.05);
+  // Passive oxygen drain: slower so early levels feel forgiving
+  state.oxygen = Math.max(0, state.oxygen - dt * 0.01);
   if (state.oxygen <= 0) {
     gameOver();
     return;
+  }
+
+  // If the jerry can is low and a guaranteed wave is due, spawn it first to
+  // give the player a fair chance to slice enough H2O.
+  if (
+    state.canFillPct < GUARANTEED_WAVE.threshold &&
+    (!state.lastGuaranteedAt || now - state.lastGuaranteedAt > GUARANTEED_WAVE.cooldown)
+  ) {
+    spawnGuaranteedWave(now);
+    state.lastGuaranteedAt = now;
   }
 
   spawnObject(now);
@@ -489,10 +587,10 @@ function update(dt, now) {
 
     if (!object.sliced && object.y + object.radius < 0) {
       if (object.type === "toxin") {
-        state.lives -= 1;
-        state.oxygen = Math.max(0, state.oxygen - 8);
+        // Missed toxin: apply a smaller oxygen penalty rather than an immediate life loss
+        state.oxygen = Math.max(0, state.oxygen - 5);
         addEffect(object.x, 18, "#bf6c46", 24);
-        if (state.lives <= 0 || state.oxygen <= 0) {
+        if (state.oxygen <= 0) {
           gameOver();
           return;
         }
@@ -502,6 +600,11 @@ function update(dt, now) {
         addScoreEffect(-10, object.x, 18);
       }
       updateHud();
+      // remove any DOM element for missed objects
+      if (object._el) {
+        try { object._el.remove(); } catch (e) {}
+        object._el = null;
+      }
       continue;
     }
 
@@ -677,6 +780,18 @@ function render(now) {
 
   for (const object of state.objects) {
     drawObject(object);
+  }
+
+  // sync DOM-backed object elements to canvas positions
+  if (objectLayer && state.objects.length) {
+    for (const object of state.objects) {
+      if (object._el) {
+        const x = object.x - object.radius;
+        const y = object.y - object.radius;
+        object._el.style.transform = `translate(${x}px, ${y}px)`;
+        object._el.style.opacity = object.sliced ? '0' : '1';
+      }
+    }
   }
 
   for (const effect of state.effects) {

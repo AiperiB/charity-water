@@ -40,6 +40,7 @@
 
         <section class="stage-shell">
           <canvas id="gameCanvas" aria-label="Captain H2O game board"></canvas>
+          <div id="objectLayer" class="object-layer" aria-hidden="true"></div>
           <div class="water-ripple"></div>
           <div class="can-stage">
             <div class="can-glow"></div>
@@ -146,5 +147,32 @@
     </div>
 
     <script src="./app.js"></script>
+    <!-- Runtime error overlay (captures errors and unhandled promise rejections) -->
+    <div id="errorOverlay" aria-hidden="true" style="display:none;position:fixed;left:12px;right:12px;top:12px;z-index:9999;background:#2b2b2b;color:#fff;padding:12px;border-radius:8px;border:2px solid #ffcf57;box-shadow:0 8px 30px rgba(0,0,0,0.6);font-family:monospace;max-height:60vh;overflow:auto;">
+      <strong>Runtime error detected</strong>
+      <pre id="errorText" style="white-space:pre-wrap;margin-top:8px;font-size:13px;"></pre>
+      <button id="errorClose" style="margin-top:8px;padding:6px 10px;border-radius:6px;background:#ffc907;color:#003366;border:none;cursor:pointer;">Dismiss</button>
+    </div>
+    <script>
+      (function () {
+        const overlay = document.getElementById('errorOverlay');
+        const text = document.getElementById('errorText');
+        const close = document.getElementById('errorClose');
+        function show(msg) {
+          text.textContent = msg;
+          overlay.style.display = 'block';
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+        close.addEventListener('click', () => { overlay.style.display = 'none'; overlay.setAttribute('aria-hidden', 'true'); });
+        window.addEventListener('error', (e) => {
+          try { show('Error: ' + e.message + '\n' + e.filename + ':' + e.lineno + ':' + e.colno + '\n' + (e.error && e.error.stack ? e.error.stack : '')); } catch (ex) { console.error(ex); }
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+          try { show('Unhandled promise rejection:\n' + (e.reason && e.reason.stack ? e.reason.stack : (e.reason || String(e)))); } catch (ex) { console.error(ex); }
+        });
+        // also expose a simple logger for app code
+        window.__showRuntimeError = show;
+      }());
+    </script>
   </body>
 </html>
